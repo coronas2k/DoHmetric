@@ -26,10 +26,25 @@ SERVERS=(
   "Control D|76.76.10.0"
   "NextDNS|45.90.28.0"
   "NextDNS|45.90.30.0"
+  "DNSPod|119.29.29.29"
+  "DNSPod|119.28.28.28"
+  "AliDNS|223.5.5.5"
+  "AliDNS|223.6.6.6"
+  "360|101.226.4.6"
+  "360|218.30.118.6"
+  "DNS.SB|185.222.222.222"
+  "DNS.SB|45.11.45.11"
+  "Canadian Shield|149.112.121.20"
+  "Canadian Shield|149.112.122.20"
+  "DNS for Family|94.130.180.225"
+  "DNS for Family|78.47.64.161"
+  "DNS4EU|86.54.11.100"
+  "DNS4EU|86.54.11.200"
 )
 
 # RFC 8484 DNS-over-HTTPS endpoints. IP URLs are used where the certificate
 # includes that address; the others are the provider's documented hostname.
+# Providers listed only here did not answer on port 53.
 DOH_SERVERS=(
   "Cloudflare|https://1.1.1.1/dns-query"
   "Cloudflare|https://1.0.0.1/dns-query"
@@ -43,6 +58,23 @@ DOH_SERVERS=(
   "CleanBrowsing|https://doh.cleanbrowsing.org/doh/security-filter/"
   "Control D|https://freedns.controld.com/p0"
   "NextDNS|https://dns.nextdns.io/dns-query"
+  "DNSPod|https://doh.pub/dns-query"
+  "AliDNS|https://dns.alidns.com/dns-query"
+  "360|https://doh.360.cn/dns-query"
+  "DNS.SB|https://doh.dns.sb/dns-query"
+  "Restena|https://dnspub.restena.lu/dns-query"
+  "UncensoredDNS|https://anycast.uncensoreddns.org/dns-query"
+  "LibreDNS|https://doh.libredns.gr/dns-query"
+  "Digitale Gesellschaft|https://dns.digitale-gesellschaft.ch/dns-query"
+  "Switch|https://dns.switch.ch/dns-query"
+  "Canadian Shield|https://protected.canadianshield.cira.ca/dns-query"
+  "DNS for Family|https://dns-doh.dnsforfamily.com/dns-query"
+  "Comcast Xfinity|https://doh.xfinity.com/dns-query"
+  "DNS4EU|https://unfiltered.joindns4.eu/dns-query"
+  "OpenBLD|https://ada.openbld.net/dns-query"
+  "IIJ|https://public.dns.iij.jp/dns-query"
+  "Foundation for Applied Privacy|https://doh.applied-privacy.net/query"
+  "RethinkDNS|https://sky.rethinkdns.com/dns-query"
 )
 
 usage() {
@@ -211,17 +243,17 @@ measure_doh() {
 
 print_doh_table() {
   local state total tcp tls http ok bytes provider url
-  printf '%-14s %-52s %5s %8s %8s %9s %5s\n' \
+  printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
     "Provider" "Endpoint" "HTTP" "TCP ms" "TLS ms" "Total ms" "OK"
-  printf '%-14s %-52s %5s %8s %8s %9s %5s\n' \
-    "--------------" "----------------------------------------------------" \
+  printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
+    "------------------------------" "----------------------------------------------------" \
     "-----" "--------" "--------" "---------" "-----"
   while IFS=$'\t' read -r state total tcp tls http ok bytes provider url; do
     if [[ "$state" == "ok" ]]; then
-      printf '%-14s %-52s %5s %8s %8s %9s %5s\n' \
+      printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
         "$provider" "$url" "$http" "$tcp" "$tls" "$total" "${ok}/${SAMPLES}"
     else
-      printf '%-14s %-52s %5s %8s %8s %9s %5s\n' \
+      printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
         "$provider" "$url" "fail" "-" "-" "-" "0/${SAMPLES}"
     fi
   done < <(sort -t $'\t' -k1,1r -k2,2n "$DOH_ROWS")
@@ -316,7 +348,7 @@ run_traditional() {
     provider=${entry%%|*}
     ip=${entry#*|}
     count=$((count + 1))
-    printf '  [%2d/%2d] %-14s %s\n' "$count" "$total" "$provider" "$ip" >&2
+    printf '  [%2d/%2d] %-30s %s\n' "$count" "$total" "$provider" "$ip" >&2
     read -r state min avg max ok <<<"$(measure_dns "$ip")"
     if [[ "$state" == "ok" ]]; then
       printf 'ok\t%s\t%s\t%s\t%s\t%s\t%s\n' "$avg" "$provider" "$ip" "$min" "$max" "$ok" >>"$DNS_ROWS"
@@ -327,14 +359,14 @@ run_traditional() {
   done
   echo >&2
 
-  printf '%-16s %-16s %8s %8s %8s %8s\n' "Provider" "Address" "Avg" "Min" "Max" "OK"
-  printf '%-16s %-16s %8s %8s %8s %8s\n' "----------------" "----------------" "--------" "--------" "--------" "--------"
+  printf '%-30s %-16s %8s %8s %8s %8s\n' "Provider" "Address" "Avg" "Min" "Max" "OK"
+  printf '%-30s %-16s %8s %8s %8s %8s\n' "------------------------------" "----------------" "--------" "--------" "--------" "--------"
   while IFS=$'\t' read -r state avg provider ip min max ok; do
     if [[ "$state" == "ok" ]]; then
-      printf '%-16s %-16s %8s %8s %8s %8s\n' \
+      printf '%-30s %-16s %8s %8s %8s %8s\n' \
         "$provider" "$ip" "${avg} ms" "${min} ms" "${max} ms" "${ok}/${SAMPLES}"
     else
-      printf '%-16s %-16s %8s %8s %8s %8s\n' \
+      printf '%-30s %-16s %8s %8s %8s %8s\n' \
         "$provider" "$ip" "fail" "-" "-" "0/${SAMPLES}"
     fi
   done < <(sort -t $'\t' -k1,1r -k2,2n "$DNS_ROWS")
@@ -367,7 +399,7 @@ run_doh() {
     provider=${entry%%|*}
     url=${entry#*|}
     count=$((count + 1))
-    printf '  [%2d/%2d] %-14s %s\n' "$count" "$total_n" "$provider" "$url" >&2
+    printf '  [%2d/%2d] %-30s %s\n' "$count" "$total_n" "$provider" "$url" >&2
     stats=$(measure_doh "$url")
     if [[ "$stats" == fail ]]; then
       printf 'fail\t999999\t-\t-\tfail\t0\t0\t%s\t%s\n' "$provider" "$url" >>"$DOH_ROWS"
