@@ -4,9 +4,31 @@ Compare common public DNS resolvers from your network, then pick two from differ
 
 Port 53 answers and DNS-over-HTTPS answers are not the same measurement. DoHmetric keeps them separate so a fast handshake is not mistaken for a fast lookup.
 
-## Quick start
+## Requirements
 
-You need Bash, `dig`, and `awk`. DNS-over-HTTPS mode also needs `python3` and a `curl` built with HTTP/2.
+Bash, `dig`, and `awk`. DNS-over-HTTPS mode also needs `python3` and a `curl` built with HTTP/2.
+
+## How to install
+
+Debian and Ubuntu:
+
+```bash
+sudo apt install bind9-dnsutils python3 curl
+```
+
+RHEL, Fedora, Alma, and Rocky:
+
+```bash
+sudo dnf install bind-utils python3 curl
+```
+
+macOS:
+
+```bash
+brew install bind python
+```
+
+## Usage
 
 ```bash
 chmod +x dohmetric
@@ -17,8 +39,6 @@ chmod +x dohmetric
 ./dohmetric -m doh
 ./dohmetric -m both -d cloudflare.com -n 5
 ```
-
-## Usage
 
 ```text
 dohmetric [-m traditional|doh|both] [-d domain] [-n samples] [-t timeout]
@@ -34,15 +54,45 @@ dohmetric [-m traditional|doh|both] [-d domain] [-n samples] [-t timeout]
 
 `DOMAIN`, `SAMPLES`, `TIMEOUT`, and `MODE` set the same defaults from the environment. Passing `-t` applies that timeout to whichever modes you run.
 
+## Resolvers
+
+| Provider | Port 53 | DNS over HTTPS |
+| --- | --- | --- |
+| Google | yes | yes |
+| Cloudflare | yes | yes |
+| Quad9 | yes | yes |
+| OpenDNS | yes | yes |
+| AdGuard | yes | yes |
+| CleanBrowsing | yes | yes |
+| Control D | yes | yes |
+| NextDNS | yes | yes |
+| DNSPod | yes | yes |
+| AliDNS | yes | yes |
+| 360 | yes | yes |
+| DNS.SB | yes | yes |
+| Canadian Shield | yes | yes |
+| DNS for Family | yes | yes |
+| DNS4EU | yes | yes |
+| Restena | | yes |
+| UncensoredDNS | | yes |
+| LibreDNS | | yes |
+| Digitale Gesellschaft | | yes |
+| Switch | | yes |
+| Comcast Xfinity | | yes |
+| OpenBLD | | yes |
+| IIJ | | yes |
+| Foundation for Applied Privacy | | yes |
+| RethinkDNS | | yes |
+
 ## Traditional DNS
 
 `./dohmetric` asks each address with `dig` and ranks the query time of `NOERROR` answers.
 
 ```text
-Provider         Address               Avg      Min      Max       OK
----------------- ---------------- -------- -------- -------- --------
-Quad9            149.112.112.112     20 ms    18 ms    22 ms      5/5
-Cloudflare       1.1.1.1             22 ms    20 ms    25 ms      5/5
+Provider                       Address               Avg      Min      Max       OK
+------------------------------ ---------------- -------- -------- -------- --------
+Quad9                          149.112.112.112     20 ms    18 ms    22 ms      5/5
+Cloudflare                     1.1.1.1             22 ms    20 ms    25 ms      5/5
 ```
 
 The suggestion is the fastest address, then the fastest address from a different provider. On macOS the script prints a `networksetup` command for your first active network service. Elsewhere it prints `resolvectl` and an `/etc/resolv.conf` snippet.
@@ -52,10 +102,10 @@ The suggestion is the fastest address, then the fastest address from a different
 `./dohmetric -m doh` sends an RFC 8484 POST (`application/dns-message`) over HTTP/2. Each sample is a new `curl` process, so each sample includes a new connection.
 
 ```text
-Provider       Endpoint                                              HTTP   TCP ms   TLS ms  Total ms    OK
--------------- ---------------------------------------------------- ----- -------- -------- --------- -----
-Quad9          https://149.112.112.112/dns-query                      200    25.53    51.48     71.29   5/5
-Cloudflare     https://1.1.1.1/dns-query                              200    23.49    57.25     86.06   5/5
+Provider                       Endpoint                                              HTTP   TCP ms   TLS ms  Total ms    OK
+------------------------------ ---------------------------------------------------- ----- -------- -------- --------- -----
+Quad9                          https://149.112.112.112/dns-query                      200    25.53    51.48     71.29   5/5
+Cloudflare                     https://1.1.1.1/dns-query                              200    23.49    57.25     86.06   5/5
 ```
 
 | Column | Meaning |
