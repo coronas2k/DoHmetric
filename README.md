@@ -4,25 +4,41 @@ Compare common public DNS resolvers from your network, then pick two from differ
 
 Port 53 answers and DNS-over-HTTPS answers are not the same measurement. DoHmetric keeps them separate so a fast handshake is not mistaken for a fast lookup.
 
+## Contents
+
+- [Requirements](#requirements)
+  - [How to install](#how-to-install)
+    - [Debian and Ubuntu](#debian-and-ubuntu)
+    - [RHEL, Fedora, Alma, and Rocky](#rhel-fedora-alma-and-rocky)
+    - [macOS](#macos)
+- [Usage](#usage)
+  - [Docker](#docker)
+  - [Options](#options)
+- [Resolvers](#resolvers)
+- [Results](#results)
+  - [Traditional DNS](#traditional-dns)
+  - [DNS over HTTPS](#dns-over-https)
+- [License](#license)
+
 ## Requirements
 
 Bash, `dig`, and `awk`. DNS-over-HTTPS mode also needs `python3` and a `curl` built with HTTP/2.
 
-## How to install
+### How to install
 
-Debian and Ubuntu:
+#### Debian and Ubuntu
 
 ```bash
 sudo apt install bind9-dnsutils python3 curl
 ```
 
-RHEL, Fedora, Alma, and Rocky:
+#### RHEL, Fedora, Alma, and Rocky
 
 ```bash
 sudo dnf install bind-utils python3 curl
 ```
 
-macOS:
+#### macOS
 
 ```bash
 brew install bind python
@@ -39,6 +55,15 @@ chmod +x dohmetric
 ./dohmetric -m doh
 ./dohmetric -m both -d cloudflare.com -n 5
 ```
+
+### Docker
+
+```bash
+docker build -t dohmetric .
+docker run --rm dohmetric
+```
+
+### Options
 
 ```text
 dohmetric [-m traditional|doh|both] [-d domain] [-n samples] [-t timeout]
@@ -84,7 +109,9 @@ dohmetric [-m traditional|doh|both] [-d domain] [-n samples] [-t timeout]
 | Foundation for Applied Privacy | | yes |
 | RethinkDNS | | yes |
 
-## Traditional DNS
+## Results
+
+### Traditional DNS
 
 `./dohmetric` asks each address with `dig` and ranks the query time of `NOERROR` answers.
 
@@ -97,7 +124,7 @@ Cloudflare                     1.1.1.1             22 ms    20 ms    25 ms      
 
 The suggestion is the fastest address, then the fastest address from a different provider. On macOS the script prints a `networksetup` command for your first active network service. Elsewhere it prints `resolvectl` and an `/etc/resolv.conf` snippet.
 
-## DNS over HTTPS
+### DNS over HTTPS
 
 `./dohmetric -m doh` sends an RFC 8484 POST (`application/dns-message`) over HTTP/2. Each sample is a new `curl` process, so each sample includes a new connection.
 
