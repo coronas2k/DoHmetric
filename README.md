@@ -129,20 +129,21 @@ The suggestion is the fastest address, then the fastest address from a different
 `./dohmetric -m doh` sends an RFC 8484 POST (`application/dns-message`) over HTTP/2. Each sample is a new `curl` process, so each sample includes a new connection.
 
 ```text
-Provider                       Endpoint                                              HTTP   TCP ms   TLS ms  Total ms    OK
------------------------------- ---------------------------------------------------- ----- -------- -------- --------- -----
-Quad9                          https://149.112.112.112/dns-query                      200    25.53    51.48     71.29   5/5
-Cloudflare                     https://1.1.1.1/dns-query                              200    23.49    57.25     86.06   5/5
+Provider                       Endpoint                                              HTTP   TCP ms   TLS ms   DNS ms  Total ms    OK
+------------------------------ ---------------------------------------------------- ----- -------- -------- -------- --------- -----
+Quad9                          https://9.9.9.9/dns-query                              200    20.29    44.11    19.18     63.38   5/5
+OpenDNS                        https://doh.opendns.com/dns-query                      200    21.04    44.33    22.21     66.65   5/5
 ```
 
 | Column | Meaning |
 | --- | --- |
 | TCP | `curl` `time_connect` |
 | TLS | `curl` `time_appconnect`. This already includes TCP. It is the time until the handshake has finished. |
-| Total | `curl` `time_total`: TCP, TLS, and the DNS answer. The table is sorted by this. |
+| DNS | Time after the connection is ready until the DNS answer arrives. The table is sorted by this. |
+| Total | `curl` `time_total`: TCP, TLS, and the DNS answer. |
 | OK | Successful samples out of `-n`. |
 
-The DNS portion of a sample is about Total minus TLS. A browser that keeps the connection open pays the handshake once, then sees times closer to that lookup figure. With more than one sample, TCP, TLS, and Total are averages.
+DNS is the part comparable to a port 53 query time. Total still includes the handshake, because each sample opens a new connection. A browser that keeps the connection open pays that handshake once. With more than one sample, TCP, TLS, DNS, and Total are averages.
 
 Browsers take one custom DoH URL. Use the first suggestion, and keep the second as a fallback.
 

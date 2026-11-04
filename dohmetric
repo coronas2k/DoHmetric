@@ -107,12 +107,12 @@ What the numbers mean:
   query to each address is a warmup and is not counted.
 
   DoH mode sends one RFC 8484 POST (application/dns-message) per sample.
-  Each sample opens a new connection. The table is ordered by Total.
+  Each sample opens a new connection. The table is ordered by DNS.
     TCP    curl time_connect
     TLS    curl time_appconnect, which already includes TCP
+    DNS    time after the connection is ready until the DNS answer arrives
     Total  curl time_total: TCP, TLS, and the DNS answer
-  The DNS portion of a DoH sample is about Total minus TLS.
-  With more than one sample, TCP, TLS, and Total are averages.
+  With more than one sample, TCP, TLS, DNS, and Total are averages.
 EOF
 }
 
@@ -198,27 +198,27 @@ sys.exit(0 if ok else 1)
 PY
 }
 
-# Echo "HTTP TCP_SEC TLS_SEC TOTAL_SEC BYTES" for one successful DoH query.
+# Echo "HTTP TCP_SEC TLS_SEC PRE_SEC TOTAL_SEC BYTES" for one successful DoH query.
 doh_once() {
   local url=$1
-  local meta code tcp tls total bytes
+  local meta code tcp tls pre total bytes
 
   meta=$(curl -sS --http2 --max-time "$TIMEOUT" --connect-timeout "$TIMEOUT" \
     -o "$BODY_FILE" \
-    -w '%{http_code} %{time_connect} %{time_appconnect} %{time_total}' \
+    -w '%{http_code} %{time_connect} %{time_appconnect} %{time_pretransfer} %{time_total}' \
     -H 'Content-Type: application/dns-message' \
     -H 'Accept: application/dns-message' \
     --data-binary @"$QUERY_FILE" \
     "$url") || return 1
 
-  read -r code tcp tls total <<<"$meta"
+  read -r code tcp tls pre total <<<"$meta"
   [[ "$code" == "200" ]] || return 1
   dns_answer_ok "$BODY_FILE" || return 1
   bytes=$(wc -c <"$BODY_FILE" | tr -d ' ')
-  echo "$code $tcp $tls $total $bytes"
+  echo "$code $tcp $tls $pre $total $bytes"
 }
 
-# Print "ok TOTAL TCP TLS HTTP COUNT BYTES" in milliseconds, or "fail".
+# Print "ok DNS TOTAL TCP TLS HTTP COUNT BYTES" in milliseconds, or "fail".
 measure_doh() {
   local url=$1
   local sample i
@@ -233,28 +233,30 @@ measure_doh() {
   done
 
   awk '
-    { n++; http = $1; tcp += $2; tls += $3; tot += $4; bytes = $5 }
+    { n++; http = $1; tcp += $2; tls += $3; pre += $4; tot += $5; bytes = $6 }
     END {
       if (n == 0) { print "fail"; exit }
-      printf "ok\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\n", tot / n * 1000, tcp / n * 1000, tls / n * 1000, http, n, bytes
+      dns = (tot - pre) / n * 1000
+      if (dns < 0) dns = 0
+      printf "ok\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\n", dns, tot / n * 1000, tcp / n * 1000, tls / n * 1000, http, n, bytes
     }
   ' "$raw"
 }
 
 print_doh_table() {
-  local state total tcp tls http ok bytes provider url
-  printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
-    "Provider" "Endpoint" "HTTP" "TCP ms" "TLS ms" "Total ms" "OK"
-  printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
+  local state dns total tcp tls http ok bytes provider url
+  printf '%-30s %-52s %5s %8s %8s %8s %9s %5s\n' \
+    "Provider" "Endpoint" "HTTP" "TCP ms" "TLS ms" "DNS ms" "Total ms" "OK"
+  printf '%-30s %-52s %5s %8s %8s %8s %9s %5s\n' \
     "------------------------------" "----------------------------------------------------" \
-    "-----" "--------" "--------" "---------" "-----"
-  while IFS=$'\t' read -r state total tcp tls http ok bytes provider url; do
+    "-----" "--------" "--------" "--------" "---------" "-----"
+  while IFS=$'\t' read -r state dns total tcp tls http ok bytes provider url; do
     if [[ "$state" == "ok" ]]; then
-      printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
-        "$provider" "$url" "$http" "$tcp" "$tls" "$total" "${ok}/${SAMPLES}"
+      printf '%-30s %-52s %5s %8s %8s %8s %9s %5s\n' \
+        "$provider" "$url" "$http" "$tcp" "$tls" "$dns" "$total" "${ok}/${SAMPLES}"
     else
-      printf '%-30s %-52s %5s %8s %8s %9s %5s\n' \
-        "$provider" "$url" "fail" "-" "-" "-" "0/${SAMPLES}"
+      printf '%-30s %-52s %5s %8s %8s %8s %9s %5s\n' \
+        "$provider" "$url" "fail" "-" "-" "-" "-" "0/${SAMPLES}"
     fi
   done < <(sort -t $'\t' -k1,1r -k2,2n "$DOH_ROWS")
   echo
@@ -321,7 +323,7 @@ suggest_pair() {
       echo "  nameserver $alt_target"
     fi
   else
-    echo "Fastest DNS-over-HTTPS endpoints from two providers."
+    echo "Fastest DNS response times over HTTPS, from two providers."
     echo "Browsers take one custom URL: use the first, and keep the second as a fallback."
     echo
     echo "Chrome: Settings → Privacy and security → Security → Use secure DNS → With → custom"
@@ -391,7 +393,7 @@ run_doh() {
   if ((SAMPLES > 1)); then
     echo "  Times:   averages of the successful samples"
   fi
-  echo "  Order:   fastest total time first"
+  echo "  Order:   fastest DNS response time first"
   echo
 
   local entry provider url stats total count=0 total_n=${#DOH_SERVERS[@]}
@@ -402,7 +404,7 @@ run_doh() {
     printf '  [%2d/%2d] %-30s %s\n' "$count" "$total_n" "$provider" "$url" >&2
     stats=$(measure_doh "$url")
     if [[ "$stats" == fail ]]; then
-      printf 'fail\t999999\t-\t-\tfail\t0\t0\t%s\t%s\n' "$provider" "$url" >>"$DOH_ROWS"
+      printf 'fail\t999999\t-\t-\t-\tfail\t0\t0\t%s\t%s\n' "$provider" "$url" >>"$DOH_ROWS"
     else
       printf '%s\t%s\t%s\n' "$stats" "$provider" "$url" >>"$DOH_ROWS"
       total=${stats#ok$'\t'}
